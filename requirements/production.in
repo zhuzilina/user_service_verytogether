@@ -1,0 +1,29 @@
+-r base.in
+
+# Production Database Drivers
+# PostgreSQL (recommended for production)
+psycopg2-binary>=2.9.9,<3.0.0
+
+# Redis (for production caching and sessions)
+redis>=5.0.1,<6.0.0
+django-redis>=5.4.0,<6.0.0
+
+# Production Server
+gunicorn>=21.2.0,<22.0.0
+uvicorn>=0.24.0,<1.0.0
+
+# Monitoring and Logging
+structlog>=23.2.0,<24.0.0
+sentry-sdk>=1.38.0,<2.0.0
+
+# Background Tasks (if needed)
+celery>=5.3.4,<6.0.0
+
+# Security
+django-environ>=0.11.0,<1.0.0
+
+# Performance
+django-storages>=1.14.0,<2.0.0
+
+# Rate Limiting
+django-ratelimit>=4.1.0,<5.0.0
