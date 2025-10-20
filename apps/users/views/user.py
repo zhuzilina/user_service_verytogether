@@ -10,6 +10,8 @@ from django.utils import timezone
 from django.db import transaction
 from drf_spectacular.utils import extend_schema
 
+from ..utils.jwt_utils import jwt_utils
+
 from ..models import User, UserActivity
 from ..serializers import (
     UserSerializer, UserCreateSerializer, UserUpdateSerializer,
@@ -242,7 +244,10 @@ class LoginView(APIView):
         description="用户认证并返回访问令牌",
         request=UserLoginSerializer,
         responses={200: {"type": "object", "properties": {
-            "token": {"type": "string"},
+            "access_token": {"type": "string"},
+            "refresh_token": {"type": "string"},
+            "token_type": {"type": "string"},
+            "expires_in": {"type": "integer"},
             "user": UserSerializer
         }}}
     )
@@ -253,8 +258,8 @@ class LoginView(APIView):
 
         user = serializer.validated_data['user']
 
-        # Create or get token
-        token, created = Token.objects.get_or_create(user=user)
+        # Generate JWT tokens
+        tokens = jwt_utils.generate_tokens(user)
 
         # Update last login time
         user.update_last_login_time()
@@ -269,7 +274,10 @@ class LoginView(APIView):
         )
 
         return Response({
-            'token': token.key,
+            'access_token': tokens['access_token'],
+            'refresh_token': tokens['refresh_token'],
+            'token_type': tokens['token_type'],
+            'expires_in': tokens['expires_in'],
             'user': UserSerializer(user).data
         })
 
@@ -296,10 +304,22 @@ class LogoutView(APIView):
     )
     def post(self, request):
         """Handle user logout."""
+        # Get access token from Authorization header
+        auth_header = request.META.get('HTTP_AUTHORIZATION', '')
+        access_token = None
+
+        if auth_header.startswith('Bearer '):
+            access_token = auth_header.split(' ')[1]
+
+        # Revoke access token if provided
+        if access_token:
+            jwt_utils.revoke_token(access_token)
+
+        # Also handle old DRF token cleanup
         try:
-            # Delete user's token
-            request.user.auth_token.delete()
-        except Token.DoesNotExist:
+            if hasattr(request.user, 'auth_token'):
+                request.user.auth_token.delete()
+        except:
             pass
 
         # Log activity
@@ -334,7 +354,13 @@ class RegisterView(APIView):
         summary="用户注册",
         description="注册新的用户账户（仅超级管理员）",
         request=UserCreateSerializer,
-        responses={201: UserSerializer}
+        responses={201: {"type": "object", "properties": {
+            "access_token": {"type": "string"},
+            "refresh_token": {"type": "string"},
+            "token_type": {"type": "string"},
+            "expires_in": {"type": "integer"},
+            "user": UserSerializer
+        }}}
     )
     @require_super_admin
     def post(self, request):
@@ -345,8 +371,8 @@ class RegisterView(APIView):
         with transaction.atomic():
             user = serializer.save()
 
-            # Create auth token
-            token, created = Token.objects.get_or_create(user=user)
+            # Generate JWT tokens
+            tokens = jwt_utils.generate_tokens(user)
 
             # Log activity
             UserActivity.objects.create(
@@ -358,7 +384,10 @@ class RegisterView(APIView):
             )
 
             return Response({
-                'token': token.key,
+                'access_token': tokens['access_token'],
+                'refresh_token': tokens['refresh_token'],
+                'token_type': tokens['token_type'],
+                'expires_in': tokens['expires_in'],
                 'user': UserSerializer(user).data
             }, status=status.HTTP_201_CREATED)
 
@@ -370,6 +399,60 @@ class RegisterView(APIView):
         else:
             ip = request.META.get('REMOTE_ADDR')
         return ip
+
+
+class RefreshTokenView(APIView):
+    """
+    View for refreshing JWT access tokens.
+    """
+    permission_classes = [permissions.AllowAny]
+
+    @extend_schema(
+        summary="刷新访问令牌",
+        description="使用刷新令牌获取新的访问令牌",
+        request={
+            'application/json': {
+                'type': 'object',
+                'properties': {
+                    'refresh_token': {
+                        'type': 'string',
+                        'description': '刷新令牌'
+                    }
+                },
+                'required': ['refresh_token']
+            }
+        },
+        responses={200: {
+            'type': 'object',
+            'properties': {
+                'access_token': {'type': 'string'},
+                'token_type': {'type': 'string'},
+                'expires_in': {'type': 'integer'}
+            }
+        }}
+    )
+    def post(self, request):
+        """Handle token refresh."""
+        refresh_token = request.data.get('refresh_token')
+        if not refresh_token:
+            return Response({
+                'error': '刷新令牌缺失',
+                'message': '请提供有效的刷新令牌',
+                'code': 'REFRESH_TOKEN_REQUIRED'
+            }, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            # Generate new access token
+            new_tokens = jwt_utils.refresh_access_token(refresh_token)
+
+            return Response(new_tokens)
+
+        except Exception as e:
+            return Response({
+                'error': '令牌刷新失败',
+                'message': str(e),
+                'code': 'TOKEN_REFRESH_FAILED'
+            }, status=status.HTTP_401_UNAUTHORIZED)
 
 
 class ChangePasswordView(APIView):

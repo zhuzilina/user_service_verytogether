@@ -6,7 +6,7 @@ from rest_framework.routers import DefaultRouter
 
 from ..views import (
     UserViewSet, UserActivityViewSet,
-    LoginView, LogoutView, RegisterView, ChangePasswordView
+    LoginView, LogoutView, RegisterView, ChangePasswordView, RefreshTokenView
 )
 
 # Create router for ViewSets
@@ -21,6 +21,7 @@ urlpatterns = [
     path('auth/login/', LoginView.as_view(), name='login'),
     path('auth/logout/', LogoutView.as_view(), name='logout'),
     path('auth/register/', RegisterView.as_view(), name='register'),
+    path('auth/refresh/', RefreshTokenView.as_view(), name='refresh-token'),
     path('auth/change-password/', ChangePasswordView.as_view(), name='change-password'),
 
     # ViewSet URLs

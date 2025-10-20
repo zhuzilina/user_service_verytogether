@@ -76,7 +76,8 @@ DATABASES = {
 # Django REST Framework configuration
 REST_FRAMEWORK = {
     'DEFAULT_AUTHENTICATION_CLASSES': [
-        'rest_framework.authentication.TokenAuthentication',
+        'apps.users.authentication.JWTAuthentication',
+        'rest_framework.authentication.TokenAuthentication',  # Fallback for backward compatibility
     ],
     'DEFAULT_PERMISSION_CLASSES': [
         'rest_framework.permissions.IsAuthenticated',
@@ -182,6 +183,28 @@ X_FRAME_OPTIONS = 'DENY'
 # Session configuration (minimal for API service)
 SESSION_ENGINE = 'django.contrib.sessions.backends.cache'
 SESSION_COOKIE_AGE = 86400  # 24 hours
+
+# JWT Configuration
+JWT_SECRET_KEY = config('JWT_SECRET_KEY', default=SECRET_KEY)
+JWT_ALGORITHM = config('JWT_ALGORITHM', default='HS256')
+JWT_ACCESS_TOKEN_LIFETIME = config(
+    'JWT_ACCESS_TOKEN_LIFETIME',
+    default=24,
+    cast=int
+)  # hours
+JWT_REFRESH_TOKEN_LIFETIME = config(
+    'JWT_REFRESH_TOKEN_LIFETIME',
+    default=7,
+    cast=int
+)  # days
+
+# Cache configuration for JWT blacklist
+CACHES = {
+    'default': {
+        'BACKEND': 'django.core.cache.backends.locmem.LocMemCache',
+        'LOCATION': 'user-service-cache',
+    }
+}
 
 # Create logs directory
 os.makedirs(BASE_DIR / 'logs', exist_ok=True)

@@ -13,6 +13,8 @@ from rest_framework.authentication import TokenAuthentication
 from rest_framework.authtoken.models import Token
 from rest_framework.exceptions import AuthenticationFailed
 
+from ..authentication import JWTAuthentication
+
 from ..permissions.definitions import (
     has_permission,
     has_any_permission,
@@ -30,6 +32,7 @@ class RBACMiddleware(MiddlewareMixin):
     PUBLIC_PATHS = {
         '/api/v1/auth/login/',
         '/api/v1/auth/logout/',
+        '/api/v1/auth/refresh/',
         '/api/health/',
         '/api/status/',
         '/api/docs/',
@@ -55,6 +58,7 @@ class RBACMiddleware(MiddlewareMixin):
         super().__init__(get_response)
         self.get_response = get_response
         self.token_authenticator = TokenAuthentication()
+        self.jwt_authenticator = JWTAuthentication()
 
     def is_public_path(self, path: str) -> bool:
         """检查是否为公开路径"""
@@ -153,22 +157,33 @@ class RBACMiddleware(MiddlewareMixin):
 
     def authenticate_user(self, request):
         """验证用户身份"""
+        # Try JWT authentication first
+        try:
+            auth_result = self.jwt_authenticator.authenticate(request)
+            if auth_result is not None:
+                return auth_result[0]  # 返回用户对象
+        except AuthenticationFailed:
+            # JWT authentication failed, try token auth as fallback
+            pass
+
+        # Fallback to DRF Token authentication
         try:
             auth_result = self.token_authenticator.authenticate(request)
-            if auth_result is None:
-                # Try to get token from Authorization header directly
-                auth_header = request.META.get('HTTP_AUTHORIZATION')
-                if auth_header and auth_header.startswith('Token '):
-                    token_key = auth_header.split(' ')[1]
-                    try:
-                        token = Token.objects.select_related('user').get(key=token_key)
-                        return token.user
-                    except Token.DoesNotExist:
-                        return None
-                return None
-            return auth_result[0]  # 返回用户对象
+            if auth_result is not None:
+                return auth_result[0]  # 返回用户对象
+
+            # Try to get token from Authorization header directly
+            auth_header = request.META.get('HTTP_AUTHORIZATION')
+            if auth_header and auth_header.startswith('Token '):
+                token_key = auth_header.split(' ')[1]
+                try:
+                    token = Token.objects.select_related('user').get(key=token_key)
+                    return token.user
+                except Token.DoesNotExist:
+                    return None
+            return None
         except AuthenticationFailed as e:
-            logger.warning(f"Token认证失败: {e}")
+            logger.warning(f"认证失败: {e}")
             return None
 
     def check_user_permissions(self, user, required_permissions: Set[str]) -> bool:
