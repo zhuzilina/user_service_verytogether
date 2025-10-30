@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   # User Service
   user-service:
@@ -10,16 +8,19 @@ services:
     ports:
       - "${SERVICE_PORT:-8001}:8001"
     environment:
-      - DEBUG=False
-      - DB_ENGINE=django.db.backends.postgresql
-      - DB_NAME=user_service_db
-      - DB_USER=postgres
-      - DB_PASSWORD=postgres123
-      - DB_HOST=db
-      - DB_PORT=5432
-      - REDIS_URL=redis://redis:6379/0
+      - DEBUG=${DEBUG:-True}
+      - DB_ENGINE=${DB_ENGINE:-django.db.backends.postgresql}
+      - DB_NAME=${DB_NAME:-user_service_db}
+      - DB_USER=${DB_USER:-postgres}
+      - DB_PASSWORD=${DB_PASSWORD:-postgres123}
+      - DB_HOST=${DB_HOST:-db}
+      - DB_PORT=${DB_PORT:-5432}
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
       - SECRET_KEY=${SECRET_KEY:-django-insecure-change-in-production}
-      - ALLOWED_HOSTS=localhost,127.0.0.1,user-service
+      - ALLOWED_HOSTS=${ALLOWED_HOSTS:-*}
+      - SERVICE_NAME=${SERVICE_NAME:-user-service}
+      - SERVICE_VERSION=${SERVICE_VERSION:-1.0.0}
+      - SERVICE_PORT=${SERVICE_PORT:-8001}
     depends_on:
       - db
       - redis
@@ -38,7 +39,7 @@ services:
       - POSTGRES_PASSWORD=postgres123
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./scripts/init-db.sql:/docker-entrypoint-initdb.d/init.sql
+      - ./scripts:/docker-entrypoint-initdb.d
     ports:
       - "5432:5432"
     networks:

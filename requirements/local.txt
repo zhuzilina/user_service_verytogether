@@ -124,8 +124,6 @@ mypy-extensions==1.1.0
     # via
     #   black
     #   mypy
-mysqlclient==2.2.7
-    # via -r requirements/local.in
 packaging==25.0
     # via
     #   black
@@ -163,7 +161,9 @@ pygments==2.19.2
     #   ipython
     #   sphinx
 pyjwt==2.10.1
-    # via redis
+    # via
+    #   -r requirements/base.in
+    #   redis
 pytest==7.4.4
     # via
     #   -r requirements/local.in

@@ -9,6 +9,10 @@ ENV DEBIAN_FRONTEND=noninteractive
 # Set work directory
 WORKDIR /app
 
+# Use Aliyun mirrors for faster package downloads
+RUN sed -i 's/deb.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources \
+    && sed -i 's/security.debian.org/mirrors.aliyun.com/g' /etc/apt/sources.list.d/debian.sources
+
 # Install system dependencies
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -17,6 +21,9 @@ RUN apt-get update \
         libpq-dev \
         curl \
         && rm -rf /var/lib/apt/lists/*
+
+# Configure pip to use Tsinghua mirrors for faster downloads
+RUN pip config set global.index-url https://pypi.tuna.tsinghua.edu.cn/simple
 
 # Install pip-tools first
 COPY requirements/ requirements/
@@ -29,15 +36,13 @@ RUN pip install --no-cache-dir -r requirements/production.txt
 # Copy project files
 COPY . .
 
-# Create logs directory
-RUN mkdir -p logs
-
 # Create non-root user
 RUN addgroup --system django \
     && adduser --system --ingroup django django
 
-# Change ownership of the app directory
-RUN chown -R django:django /app
+# Create logs directory with proper permissions
+RUN mkdir -p logs \
+    && chown -R django:django /app
 
 # Switch to non-root user
 USER django
